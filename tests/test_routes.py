@@ -139,3 +139,35 @@ class TestAccountService(TestCase):
         """It should not Read an Account that is not found"""
         resp = self.client.get(f"{BASE_URL}/0")
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+
+    def test_list_all_accounts(client):
+        """Test listing all accounts"""
+        # First, clear any existing accounts
+        Account.remove_all()
+
+        # Create two accounts
+        account1 = Account(name="Alice", email="alice@example.com", address="123 Apple St", phone_number="1111111111")
+        account2 = Account(name="Bob", email="bob@example.com", address="456 Banana Ave", phone_number="2222222222")
+        account1.create()
+        account2.create()
+
+        # Get list of accounts
+        response = client.get("/accounts")
+        assert response.status_code == status.HTTP_200_OK
+
+        data = response.get_json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+        ids = [account["id"] for account in data]
+        assert account1.id in ids
+        assert account2.id in ids
+
+    def test_list_empty_accounts(client):
+        """Test listing accounts when none exist"""
+        # Ensure the DB is empty
+        Account.remove_all()
+
+        response = client.get("/accounts")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.get_json() == []
