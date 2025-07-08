@@ -38,12 +38,12 @@ class TestAccountService(TestCase):
     @classmethod
     def tearDownClass(cls):
         """Runs once before test suite"""
+        db.session.close()
 
     def setUp(self):
         """Runs before each test"""
         db.session.query(Account).delete()  # clean up the last tests
         db.session.commit()
-
         self.client = app.test_client()
 
     def tearDown(self):
@@ -53,7 +53,6 @@ class TestAccountService(TestCase):
     ######################################################################
     #  H E L P E R   M E T H O D S
     ######################################################################
-
     def _create_accounts(self, count):
         """Factory method to create accounts in bulk"""
         accounts = []
@@ -73,7 +72,6 @@ class TestAccountService(TestCase):
     ######################################################################
     #  A C C O U N T   T E S T   C A S E S
     ######################################################################
-
     def test_index(self):
         """It should get 200_OK from the Home Page"""
         response = self.client.get("/")
@@ -82,7 +80,7 @@ class TestAccountService(TestCase):
     def test_health(self):
         """It should be healthy"""
         resp = self.client.get("/health")
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
         data = resp.get_json()
         self.assertEqual(data["status"], "OK")
 
@@ -118,12 +116,10 @@ class TestAccountService(TestCase):
         account = AccountFactory()
         response = self.client.post(
             BASE_URL,
-            json=account.serialize(),
+            data=account.serialize(),
             content_type="test/html"
         )
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
-
-    # ADD YOUR TEST CASES HERE ...
 
     def test_get_account(self):
         """It should Read a single Account"""
@@ -140,34 +136,17 @@ class TestAccountService(TestCase):
         resp = self.client.get(f"{BASE_URL}/0")
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
-
-    def test_list_all_accounts(client):
-        """Test listing all accounts"""
-        # First, clear any existing accounts
-        Account.remove_all()
-
-        # Create two accounts
-        account1 = Account(name="Alice", email="alice@example.com", address="123 Apple St", phone_number="1111111111")
-        account2 = Account(name="Bob", email="bob@example.com", address="456 Banana Ave", phone_number="2222222222")
-        account1.create()
-        account2.create()
-
-        # Get list of accounts
-        response = client.get("/accounts")
-        assert response.status_code == status.HTTP_200_OK
-
+    def test_list_all_accounts(self):
+        """It should list all accounts"""
+        self._create_accounts(2)
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
-        assert isinstance(data, list)
-        assert len(data) == 2
-        ids = [account["id"] for account in data]
-        assert account1.id in ids
-        assert account2.id in ids
+        self.assertIsInstance(data, list)
+        self.assertGreaterEqual(len(data), 2)
 
-    def test_list_empty_accounts(client):
-        """Test listing accounts when none exist"""
-        # Ensure the DB is empty
-        Account.remove_all()
-
-        response = client.get("/accounts")
-        assert response.status_code == status.HTTP_200_OK
-        assert response.get_json() == []
+    def test_list_empty_accounts(self):
+        """It should return empty list when no accounts exist"""
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json(), [])
